@@ -98,6 +98,31 @@
     color: var(--muted);
   }
   .log b { color: var(--ink); font-weight: 500; }
+
+  /* attendance / seat board */
+  .stats { display: flex; flex-wrap: wrap; gap: 18px; align-items: baseline; }
+  .stats .big { font-size: 28px; font-variant-numeric: tabular-nums; }
+  .stats .big small { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .stats .lbl { color: var(--muted); font-size: 12px; }
+  .stats .spacer { flex: 1; }
+  .hint { color: var(--muted); font-size: 12px; }
+  input[type=range] { width: 160px; vertical-align: middle; }
+  button.on { background: var(--online); border-color: var(--online); color: #fff; }
+  .desk { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px; border: 1px dashed var(--line); border-radius: 8px; margin: 0 auto 16px; width: max-content; }
+  .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+  .seat { border: 2px solid var(--line); border-radius: 10px; padding: 10px 8px; text-align: center; background: var(--panel); transition: transform .08s; cursor: pointer; }
+  .seat:hover { transform: translateY(-1px); }
+  .seat .icon { font-size: 20px; line-height: 1; margin-bottom: 4px; }
+  .seat .name { font-weight: 600; font-size: 13px; }
+  .seat .mv { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .seat.occ { border-color: var(--online); background: color-mix(in srgb, var(--online) 14%, var(--panel)); }
+  .seat.empty { border-color: var(--offline); opacity: .7; }
+  .seat.unknown { border-color: var(--stale); }
+  .seat.stale { border-color: var(--stale); border-style: dashed; }
+  .seat.offline { border-color: var(--offline); opacity: .4; }
+  .empty-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+  .empty-list .none { color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -112,6 +137,22 @@
   <input type="text" id="port" value="9001" style="width:70px">
   <button class="primary" id="connectBtn">연결</button>
   <div class="status"><span class="dot" id="dot"></span><span id="stateText">연결 안 됨</span></div>
+</div>
+
+<div class="panel">
+  <h2>출석 / 빈자리</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:14px">
+    <label>임계값 <span id="thrVal">1500</span>mV</label>
+    <input type="range" id="thr" min="0" max="3300" step="50" value="1500">
+    <label><input type="checkbox" id="invert"> 방향 반전</label>
+    <button id="modeBtn" class="on">자동 감지</button>
+    <span class="hint" id="modeHint">자동: A0 ≥ 임계값이면 착석. 수동으로 전환해 자리 클릭.</span>
+  </div>
+  <div class="stats" id="attStats" style="margin-bottom:14px"></div>
+  <div class="desk">📚 교탁 / 강사석</div>
+  <div class="grid" id="grid"><div class="hint">연결을 기다리는 중…</div></div>
+  <h2 style="margin-top:16px">빈자리 목록</h2>
+  <div class="empty-list" id="emptyList"><span class="none">—</span></div>
 </div>
 
 <div class="panel">
@@ -265,6 +306,8 @@ const DROP_MS  = 60000;     // offline this long -> stop drawing the node
 
 const nodes = new Map();    // id -> { status, led, raw, mv, last }
 let client = null;
+let threshold = 1500, invert = false, autoMode = true;
+const seatEls = new Map();   // id -> {cell, icon, name, mv}  persistent refs so seat clicks survive re-renders
 
 const $ = (id) => document.getElementById(id);
 
@@ -288,6 +331,19 @@ function nodeState(n, now) {
   return 'online';
 }
 
+function occupancy(n) {
+  if (!autoMode) return n.manual;
+  if (n.mv === null) return null;
+  return invert ? (n.mv < threshold) : (n.mv >= threshold);
+}
+
+function seatClass(n, now) {
+  if (n.status === 'offline') return 'offline';
+  if (n.mv === null || n.last === 0) return 'unknown';
+  if (now - n.last > STALE_MS) return 'stale';
+  return occupancy(n) ? 'occ' : 'empty';
+}
+
 function onMessage(topic, payload) {
   log(topic, payload);
 
@@ -296,7 +352,7 @@ function onMessage(topic, payload) {
   const id = parts[1];
   const leaf = parts.slice(2).join('/');
 
-  if (!nodes.has(id)) nodes.set(id, { status: 'online', led: null, raw: null, mv: null, last: 0 });
+  if (!nodes.has(id)) nodes.set(id, { status: 'online', led: null, raw: null, mv: null, last: 0, manual: false });
   const n = nodes.get(id);
   n.last = Date.now();
 
@@ -402,8 +458,69 @@ function renderCards(list) {
   }).join('');
 }
 
+function renderAttendance(list) {
+  const now = Date.now();
+  const online = list.filter(([, n]) => n.status !== 'offline');
+  let occ = 0; const empty = [];
+  for (const [id, n] of online) {
+    const o = occupancy(n);
+    if (o === true) occ++;
+    else if (o === false && n.mv !== null && now - n.last <= STALE_MS) empty.push(id);
+  }
+  const total = online.length;
+  const rate = total ? Math.round(occ / total * 100) : 0;
+  const offline = list.length - online.length;
+  $('attStats').innerHTML =
+    `<div><div class="big">${occ}<small>/<span>${total}</span></small></div><div class="lbl">착석 / 온라인 자리</div></div>` +
+    `<div><div class="big">${rate}<small>%</small></div><div class="lbl">착석률</div></div>` +
+    `<div><div class="big">${empty.length}</div><div class="lbl">빈자리</div></div>` +
+    `<div><div class="big">${offline}</div><div class="lbl">연결 끊김</div></div>` +
+    `<div class="spacer"></div>`;
+
+  const grid = $('grid');
+  const ids = list.map(([id]) => id);
+  const cur = grid.dataset.order ? grid.dataset.order.split(',') : [];
+  const same = ids.length === cur.length && ids.every((v, i) => v === cur[i]);
+  if (!same) {
+    seatEls.clear();
+    if (ids.length === 0) {
+      grid.innerHTML = '<div class="hint">연결을 기다리는 중…</div>';
+    } else {
+      grid.innerHTML = '';
+      for (const [id] of list) {
+        const cell = document.createElement('div');
+        cell.className = 'seat'; cell.dataset.id = id;
+        cell.innerHTML = '<div class="icon"></div><div class="name"></div><div class="mv"></div>';
+        grid.appendChild(cell);
+        seatEls.set(id, { cell, icon: cell.querySelector('.icon'), name: cell.querySelector('.name'), mv: cell.querySelector('.mv') });
+      }
+    }
+    grid.dataset.order = ids.join(',');
+  }
+  for (const [id, n] of list) {
+    const el = seatEls.get(id); if (!el) continue;
+    const cls = seatClass(n, now);
+    const o = occupancy(n);
+    let icon = '·', label = '—';
+    if (cls === 'offline') { icon = '✕'; label = '연결없음'; }
+    else if (cls === 'unknown') { icon = '?'; label = '대기'; }
+    else if (cls === 'stale') { icon = '!'; label = '응답없음'; }
+    else if (o) { icon = '✓'; label = '착석'; }
+    else { icon = '○'; label = '빈자리'; }
+    const mv = n.mv === null ? '' : `${n.mv}mV`;
+    el.cell.className = `seat ${cls}`;
+    el.icon.textContent = icon;
+    el.name.textContent = id;
+    el.mv.textContent = `${mv} · ${label}`;
+  }
+
+  const eList = $('emptyList');
+  eList.innerHTML = empty.length ? empty.map(n => `<span class="chip">${n}</span>`).join('') : '<span class="none">빈자리 없음</span>';
+}
+
 function render() {
   const list = visibleNodes();
+  renderAttendance(list);
   renderGraph(list);
   renderCards(list);
 }
@@ -442,6 +559,28 @@ function connect() {
 
   client.connect();
 }
+
+$('thr').addEventListener('input', (e) => { threshold = +e.target.value; $('thrVal').textContent = threshold; render(); });
+$('invert').addEventListener('change', (e) => { invert = e.target.checked; render(); });
+$('modeBtn').addEventListener('click', () => {
+  autoMode = !autoMode;
+  const btn = $('modeBtn');
+  btn.textContent = autoMode ? '자동 감지' : '수동 모드';
+  btn.className = autoMode ? 'on' : '';
+  $('modeHint').textContent = autoMode
+    ? '자동: A0 ≥ 임계값이면 착석. 수동으로 전환해 자리 클릭.'
+    : '수동: 자리를 클릭해 착석/빈자리 표시 (보드 LED도 토글).';
+  render();
+});
+$('grid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.seat'); if (!cell) return;
+  const id = cell.dataset.id;
+  const n = nodes.get(id); if (!n || n.status === 'offline') return;
+  if (autoMode) return;
+  n.manual = !n.manual;
+  sendLed(id, n.manual ? 'on' : 'off');
+  render();
+});
 
 $('connectBtn').addEventListener('click', connect);
 
