@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # mqtt-guccipachi skill - talk to the classroom MQTT broker from the shell.
 #
 # Requires the mosquitto clients (mosquitto_pub / mosquitto_sub):

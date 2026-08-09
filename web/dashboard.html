@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -103,29 +103,29 @@
 <body>
 
 <h1>guccipachi MQTT Dashboard</h1>
-<div class="sub">媛??몃뱶媛 釉뚮줈而ㅼ뿉 ?대뼸寃?遺숈뼱 ?덈뒗吏, 臾댁뾿??蹂대궡怨??덈뒗吏 ?ㅼ떆媛꾩쑝濡?蹂댁뿬以띾땲??</div>
+<div class="sub">각 노드가 브로커에 어떻게 붙어 있는지, 무엇을 보내고 있는지 실시간으로 보여줍니다.</div>
 
 <div class="bar">
   <label for="host">Broker</label>
   <input type="text" id="host" value="192.168.0.75">
   <label for="port">Port</label>
   <input type="text" id="port" value="9001" style="width:70px">
-  <button class="primary" id="connectBtn">?곌껐</button>
-  <div class="status"><span class="dot" id="dot"></span><span id="stateText">?곌껐 ????/span></div>
+  <button class="primary" id="connectBtn">연결</button>
+  <div class="status"><span class="dot" id="dot"></span><span id="stateText">연결 안 됨</span></div>
 </div>
 
 <div class="panel">
-  <h2>?곌껐 援ъ“</h2>
-  <svg id="graph" viewBox="0 0 800 380" role="img" aria-label="釉뚮줈而ㅼ? ?몃뱶 ?곌껐 援ъ“"></svg>
+  <h2>연결 구조</h2>
+  <svg id="graph" viewBox="0 0 800 380" role="img" aria-label="브로커와 노드 연결 구조"></svg>
 </div>
 
 <div class="panel">
-  <h2>?몃뱶</h2>
-  <div class="cards" id="cards"><div class="empty">?꾩쭅 ?ㅼ뼱???몃뱶媛 ?놁뒿?덈떎.</div></div>
+  <h2>노드</h2>
+  <div class="cards" id="cards"><div class="empty">아직 들어온 노드가 없습니다.</div></div>
 </div>
 
 <div class="panel">
-  <h2>硫붿떆吏 濡쒓렇</h2>
+  <h2>메시지 로그</h2>
   <div class="log" id="log"></div>
 </div>
 
@@ -338,7 +338,7 @@ function renderGraph(list) {
   let out = '';
 
   if (list.length === 0) {
-    out += `<text x="${cx}" y="${cy + 70}" class="hub-sub">?곌껐???몃뱶 ?놁쓬</text>`;
+    out += `<text x="${cx}" y="${cy + 70}" class="hub-sub">연결된 노드 없음</text>`;
   }
 
   // Spread nodes on a circle around the broker; radius grows a little with count.
@@ -377,26 +377,26 @@ function renderCards(list) {
   const now = Date.now();
 
   if (list.length === 0) {
-    el.innerHTML = '<div class="empty">?꾩쭅 ?ㅼ뼱???몃뱶媛 ?놁뒿?덈떎.</div>';
+    el.innerHTML = '<div class="empty">아직 들어온 노드가 없습니다.</div>';
     return;
   }
 
   el.innerHTML = list.map(([id, n]) => {
     const state = nodeState(n, now);
     const color = state === 'online' ? 'var(--online)' : state === 'stale' ? 'var(--stale)' : 'var(--offline)';
-    const label = state === 'online' ? '?⑤씪?? : state === 'stale' ? '?묐떟 ?놁쓬' : '?ㅽ봽?쇱씤';
-    const ago = n.last ? Math.round((now - n.last) / 1000) + '珥??? : '-';
+    const label = state === 'online' ? '온라인' : state === 'stale' ? '응답 없음' : '오프라인';
+    const ago = n.last ? Math.round((now - n.last) / 1000) + '초 전' : '-';
     const led = n.led === null ? '?' : n.led ? 'ON' : 'OFF';
     return `
       <div class="card">
         <div class="name"><span class="dot" style="background:${color}"></span>${id}</div>
-        <div class="meta">${label} 쨌 留덉?留??섏떊 ${ago} 쨌 LED ${led}</div>
-        <div class="val">${n.mv === null ? '?? : n.mv} <small>mV</small></div>
-        <div class="meta">raw ${n.raw === null ? '?? : n.raw} / 4095</div>
+        <div class="meta">${label} · 마지막 수신 ${ago} · LED ${led}</div>
+        <div class="val">${n.mv === null ? '—' : n.mv} <small>mV</small></div>
+        <div class="meta">raw ${n.raw === null ? '—' : n.raw} / 4095</div>
         <div class="btns">
-          <button onclick="sendLed('${id}','on')">耳쒓린</button>
-          <button onclick="sendLed('${id}','off')">?꾧린</button>
-          <button onclick="sendLed('${id}','toggle')">?좉?</button>
+          <button onclick="sendLed('${id}','on')">켜기</button>
+          <button onclick="sendLed('${id}','off')">끄기</button>
+          <button onclick="sendLed('${id}','toggle')">토글</button>
         </div>
       </div>`;
   }).join('');
@@ -422,19 +422,19 @@ function connect() {
   const port = $('port').value.trim();
   const url = `ws://${host}:${port}`;
 
-  setState('', `?곌껐 以?.. (${url})`);
+  setState('', `연결 중... (${url})`);
 
   client = new MqttClient(url, {
     onConnect: () => {
-      setState('up', `?곌껐????${url}`);
+      setState('up', `연결됨 — ${url}`);
       client.subscribe('classroom/#');
       log('(dashboard)', 'subscribed to classroom/#');
     },
-    onRefused: (rc) => setState('down', `釉뚮줈而ㅺ? ?곌껐??嫄곕??덉뒿?덈떎 (rc=${rc})`),
-    onError: () => setState('down', `?곌껐 ?ㅽ뙣 ??${url} ???우? 紐삵뻽?듬땲??),
+    onRefused: (rc) => setState('down', `브로커가 연결을 거부했습니다 (rc=${rc})`),
+    onError: () => setState('down', `연결 실패 — ${url} 에 닿지 못했습니다`),
     onClose: (byUs) => {
       if (byUs) return;
-      setState('down', '?곌껐???딄꼈?듬땲?? 5珥????ъ떆?꾪빀?덈떎.');
+      setState('down', '연결이 끊겼습니다. 5초 후 재시도합니다.');
       setTimeout(connect, 5000);
     },
     onMessage
