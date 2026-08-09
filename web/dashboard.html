@@ -1,0 +1,457 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>guccipachi MQTT Dashboard</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --line: #dfe3e8;
+    --ink: #16191d;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --online: #16a34a;
+    --offline: #9ca3af;
+    --stale: #d97706;
+    --led-on: #f59e0b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --panel: #171a20;
+      --line: #2a2f38;
+      --ink: #e8eaed;
+      --muted: #9aa1ad;
+      --accent: #60a5fa;
+      --online: #4ade80;
+      --offline: #6b7280;
+      --stale: #fbbf24;
+      --led-on: #fbbf24;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, "Segoe UI", "Malgun Gothic", sans-serif;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+
+  .bar {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 20px;
+  }
+  .bar label { color: var(--muted); font-size: 13px; }
+  input[type=text] {
+    font: inherit; padding: 6px 10px; width: 190px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink);
+  }
+  button {
+    font: inherit; padding: 6px 14px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--ink);
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--offline); }
+  .dot.up { background: var(--online); }
+  .dot.down { background: #ef4444; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px; margin-bottom: 20px;
+  }
+  .panel h2 { font-size: 14px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+
+  svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .link { stroke: var(--line); stroke-width: 2; }
+  .link.live { stroke: var(--online); }
+  .link.stale { stroke: var(--stale); stroke-dasharray: 5 4; }
+  .hub { fill: var(--accent); }
+  .hub-label, .node-label { fill: var(--ink); font-size: 12px; text-anchor: middle; }
+  .hub-sub { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+  .node { fill: var(--panel); stroke: var(--offline); stroke-width: 2; }
+  .node.online { stroke: var(--online); }
+  .node.stale { stroke: var(--stale); }
+  .node.led-on { fill: var(--led-on); }
+
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--panel); }
+  .card .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card .meta { color: var(--muted); font-size: 12px; margin: 6px 0 10px; }
+  .card .val { font-size: 26px; font-variant-numeric: tabular-nums; }
+  .card .val small { font-size: 13px; color: var(--muted); font-weight: 400; }
+  .card .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .empty { color: var(--muted); font-size: 14px; }
+
+  .log {
+    font: 12px/1.6 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    max-height: 220px; overflow-y: auto; white-space: pre-wrap;
+    color: var(--muted);
+  }
+  .log b { color: var(--ink); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<h1>guccipachi MQTT Dashboard</h1>
+<div class="sub">媛??몃뱶媛 釉뚮줈而ㅼ뿉 ?대뼸寃?遺숈뼱 ?덈뒗吏, 臾댁뾿??蹂대궡怨??덈뒗吏 ?ㅼ떆媛꾩쑝濡?蹂댁뿬以띾땲??</div>
+
+<div class="bar">
+  <label for="host">Broker</label>
+  <input type="text" id="host" value="192.168.0.75">
+  <label for="port">Port</label>
+  <input type="text" id="port" value="9001" style="width:70px">
+  <button class="primary" id="connectBtn">?곌껐</button>
+  <div class="status"><span class="dot" id="dot"></span><span id="stateText">?곌껐 ????/span></div>
+</div>
+
+<div class="panel">
+  <h2>?곌껐 援ъ“</h2>
+  <svg id="graph" viewBox="0 0 800 380" role="img" aria-label="釉뚮줈而ㅼ? ?몃뱶 ?곌껐 援ъ“"></svg>
+</div>
+
+<div class="panel">
+  <h2>?몃뱶</h2>
+  <div class="cards" id="cards"><div class="empty">?꾩쭅 ?ㅼ뼱???몃뱶媛 ?놁뒿?덈떎.</div></div>
+</div>
+
+<div class="panel">
+  <h2>硫붿떆吏 濡쒓렇</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   Minimal MQTT 3.1.1 over WebSockets.
+
+   Written by hand rather than pulling in mqtt.js from a CDN: the classroom
+   broker may sit on a network with no internet access, and a dashboard that
+   only works when a CDN is reachable is a dashboard that fails in class.
+   Only what this page needs: CONNECT, SUBSCRIBE, PUBLISH (QoS 0), PINGREQ.
+------------------------------------------------------------------ */
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+function varLen(n) {
+  const out = [];
+  do {
+    let digit = n % 128;
+    n = Math.floor(n / 128);
+    if (n > 0) digit |= 0x80;
+    out.push(digit);
+  } while (n > 0);
+  return out;
+}
+
+function mqttString(s) {
+  const b = enc.encode(s);
+  return [b.length >> 8, b.length & 0xff, ...b];
+}
+
+class MqttClient {
+  constructor(url, handlers) {
+    this.url = url;
+    this.handlers = handlers;
+    this.buf = new Uint8Array(0);
+    this.pid = 1;
+    this.ping = null;
+    this.closedByUs = false;
+  }
+
+  connect() {
+    // Mosquitto's websockets listener requires the "mqtt" subprotocol.
+    this.ws = new WebSocket(this.url, 'mqtt');
+    this.ws.binaryType = 'arraybuffer';
+
+    this.ws.onopen = () => {
+      const clientId = 'dash-' + Math.random().toString(16).slice(2, 8);
+      const body = [
+        ...mqttString('MQTT'), 0x04,   // protocol name + level 4 (3.1.1)
+        0x02,                          // flags: clean session
+        0x00, 0x3c,                    // keepalive 60s
+        ...mqttString(clientId)
+      ];
+      this.send([0x10, ...varLen(body.length), ...body]);
+    };
+
+    this.ws.onmessage = (ev) => this.feed(new Uint8Array(ev.data));
+    this.ws.onclose = () => {
+      clearInterval(this.ping);
+      this.handlers.onClose(this.closedByUs);
+    };
+    this.ws.onerror = () => this.handlers.onError();
+  }
+
+  close() {
+    this.closedByUs = true;
+    clearInterval(this.ping);
+    if (this.ws) this.ws.close();
+  }
+
+  send(bytes) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(new Uint8Array(bytes));
+    }
+  }
+
+  subscribe(filter) {
+    const id = this.pid++;
+    const body = [id >> 8, id & 0xff, ...mqttString(filter), 0x00];
+    this.send([0x82, ...varLen(body.length), ...body]);
+  }
+
+  publish(topic, payload) {
+    const body = [...mqttString(topic), ...enc.encode(payload)];
+    this.send([0x30, ...varLen(body.length), ...body]);
+  }
+
+  // A websocket frame can carry a partial packet, or several packets at once,
+  // so buffer and only consume whole packets.
+  feed(chunk) {
+    const merged = new Uint8Array(this.buf.length + chunk.length);
+    merged.set(this.buf);
+    merged.set(chunk, this.buf.length);
+    this.buf = merged;
+
+    while (this.buf.length >= 2) {
+      let len = 0, mult = 1, i = 1;
+      let byte;
+      do {
+        if (i >= this.buf.length) return;      // length field not complete yet
+        byte = this.buf[i++];
+        len += (byte & 0x7f) * mult;
+        mult *= 128;
+      } while (byte & 0x80);
+
+      const total = i + len;
+      if (this.buf.length < total) return;     // payload not complete yet
+
+      this.handlePacket(this.buf[0] >> 4, this.buf.subarray(i, total));
+      this.buf = this.buf.subarray(total);
+    }
+  }
+
+  handlePacket(type, body) {
+    if (type === 2) {                          // CONNACK
+      const rc = body[1];
+      if (rc !== 0) { this.handlers.onRefused(rc); return; }
+      this.ping = setInterval(() => this.send([0xc0, 0x00]), 30000);
+      this.handlers.onConnect();
+    } else if (type === 3) {                   // PUBLISH (QoS 0)
+      const tlen = (body[0] << 8) | body[1];
+      const topic = dec.decode(body.subarray(2, 2 + tlen));
+      const payload = dec.decode(body.subarray(2 + tlen));
+      this.handlers.onMessage(topic, payload);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------
+   Dashboard state
+------------------------------------------------------------------ */
+
+const STALE_MS = 8000;      // no message for this long -> connection looks shaky
+const DROP_MS  = 60000;     // offline this long -> stop drawing the node
+
+const nodes = new Map();    // id -> { status, led, raw, mv, last }
+let client = null;
+
+const $ = (id) => document.getElementById(id);
+
+function setState(cls, text) {
+  $('dot').className = 'dot' + (cls ? ' ' + cls : '');
+  $('stateText').textContent = text;
+}
+
+function log(topic, payload) {
+  const el = $('log');
+  const time = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+  const line = document.createElement('div');
+  line.innerHTML = `${time}  <b>${topic}</b>  ${payload}`;
+  el.prepend(line);
+  while (el.childElementCount > 200) el.lastElementChild.remove();
+}
+
+function nodeState(n, now) {
+  if (n.status === 'offline') return 'offline';
+  if (now - n.last > STALE_MS) return 'stale';
+  return 'online';
+}
+
+function onMessage(topic, payload) {
+  log(topic, payload);
+
+  const parts = topic.split('/');            // classroom/<id>/<...>
+  if (parts.length < 3 || parts[0] !== 'classroom') return;
+  const id = parts[1];
+  const leaf = parts.slice(2).join('/');
+
+  if (!nodes.has(id)) nodes.set(id, { status: 'online', led: null, raw: null, mv: null, last: 0 });
+  const n = nodes.get(id);
+  n.last = Date.now();
+
+  if (leaf === 'status') {
+    n.status = payload;
+  } else if (leaf === 'led/state') {
+    n.led = payload === 'on';
+  } else if (leaf === 'sensor/a0') {
+    try {
+      const v = JSON.parse(payload);
+      n.raw = v.raw; n.mv = v.mv;
+    } catch (e) { /* not JSON - ignore, the log still shows it */ }
+  }
+
+  render();
+}
+
+function sendLed(id, state) {
+  if (!client) return;
+  client.publish(`classroom/${id}/led/set`, state);
+  log(`classroom/${id}/led/set`, `${state}  (sent)`);
+}
+
+/* ------------------------------------------------------------------
+   Rendering
+------------------------------------------------------------------ */
+
+function visibleNodes() {
+  const now = Date.now();
+  return [...nodes.entries()]
+    .filter(([, n]) => !(n.status === 'offline' && now - n.last > DROP_MS))
+    .sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function renderGraph(list) {
+  const svg = $('graph');
+  const now = Date.now();
+  const W = 800, H = 380, cx = W / 2, cy = H / 2;
+  let out = '';
+
+  if (list.length === 0) {
+    out += `<text x="${cx}" y="${cy + 70}" class="hub-sub">?곌껐???몃뱶 ?놁쓬</text>`;
+  }
+
+  // Spread nodes on a circle around the broker; radius grows a little with count.
+  const R = list.length > 6 ? 150 : 125;
+  const pos = list.map(([id], i) => {
+    const a = (i / Math.max(list.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    return { id, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  });
+
+  pos.forEach((p, i) => {
+    const state = nodeState(list[i][1], now);
+    const cls = state === 'online' ? 'live' : state === 'stale' ? 'stale' : '';
+    out += `<line class="link ${cls}" x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"/>`;
+  });
+
+  out += `<circle class="hub" cx="${cx}" cy="${cy}" r="34"/>`;
+  out += `<text x="${cx}" y="${cy - 2}" class="hub-label" fill="#fff">broker</text>`;
+  out += `<text x="${cx}" y="${cy + 12}" class="hub-sub" fill="#fff">${list.length} node${list.length === 1 ? '' : 's'}</text>`;
+
+  pos.forEach((p, i) => {
+    const [id, n] = list[i];
+    const state = nodeState(n, now);
+    const cls = `${state}${n.led ? ' led-on' : ''}`;
+    out += `<circle class="node ${cls}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="26"/>`;
+    out += `<text class="node-label" x="${p.x.toFixed(1)}" y="${(p.y + 46).toFixed(1)}">${id}</text>`;
+    if (n.mv !== null) {
+      out += `<text class="hub-sub" x="${p.x.toFixed(1)}" y="${(p.y + 4).toFixed(1)}">${n.mv}mV</text>`;
+    }
+  });
+
+  svg.innerHTML = out;
+}
+
+function renderCards(list) {
+  const el = $('cards');
+  const now = Date.now();
+
+  if (list.length === 0) {
+    el.innerHTML = '<div class="empty">?꾩쭅 ?ㅼ뼱???몃뱶媛 ?놁뒿?덈떎.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(([id, n]) => {
+    const state = nodeState(n, now);
+    const color = state === 'online' ? 'var(--online)' : state === 'stale' ? 'var(--stale)' : 'var(--offline)';
+    const label = state === 'online' ? '?⑤씪?? : state === 'stale' ? '?묐떟 ?놁쓬' : '?ㅽ봽?쇱씤';
+    const ago = n.last ? Math.round((now - n.last) / 1000) + '珥??? : '-';
+    const led = n.led === null ? '?' : n.led ? 'ON' : 'OFF';
+    return `
+      <div class="card">
+        <div class="name"><span class="dot" style="background:${color}"></span>${id}</div>
+        <div class="meta">${label} 쨌 留덉?留??섏떊 ${ago} 쨌 LED ${led}</div>
+        <div class="val">${n.mv === null ? '?? : n.mv} <small>mV</small></div>
+        <div class="meta">raw ${n.raw === null ? '?? : n.raw} / 4095</div>
+        <div class="btns">
+          <button onclick="sendLed('${id}','on')">耳쒓린</button>
+          <button onclick="sendLed('${id}','off')">?꾧린</button>
+          <button onclick="sendLed('${id}','toggle')">?좉?</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function render() {
+  const list = visibleNodes();
+  renderGraph(list);
+  renderCards(list);
+}
+
+// Nothing arrives when a board dies, so repaint on a timer to age the states.
+setInterval(render, 1000);
+
+/* ------------------------------------------------------------------
+   Connection handling
+------------------------------------------------------------------ */
+
+function connect() {
+  if (client) client.close();
+
+  const host = $('host').value.trim();
+  const port = $('port').value.trim();
+  const url = `ws://${host}:${port}`;
+
+  setState('', `?곌껐 以?.. (${url})`);
+
+  client = new MqttClient(url, {
+    onConnect: () => {
+      setState('up', `?곌껐????${url}`);
+      client.subscribe('classroom/#');
+      log('(dashboard)', 'subscribed to classroom/#');
+    },
+    onRefused: (rc) => setState('down', `釉뚮줈而ㅺ? ?곌껐??嫄곕??덉뒿?덈떎 (rc=${rc})`),
+    onError: () => setState('down', `?곌껐 ?ㅽ뙣 ??${url} ???우? 紐삵뻽?듬땲??),
+    onClose: (byUs) => {
+      if (byUs) return;
+      setState('down', '?곌껐???딄꼈?듬땲?? 5珥????ъ떆?꾪빀?덈떎.');
+      setTimeout(connect, 5000);
+    },
+    onMessage
+  });
+
+  client.connect();
+}
+
+$('connectBtn').addEventListener('click', connect);
+
+// ?host=192.168.0.50&port=9001 overrides the defaults, so the instructor can
+// hand out a single link when the laptop's IP changes.
+const params = new URLSearchParams(location.search);
+if (params.get('host')) $('host').value = params.get('host');
+if (params.get('port')) $('port').value = params.get('port');
+
+connect();
+</script>
+</body>
+</html>

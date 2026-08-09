@@ -1,0 +1,9 @@
+{
+  "groupings": [
+    {
+      "title": "guccipachi MQTT",
+      "description": "Control XIAO ESP32C6 boards and read their sensors over the guccipachi classroom Mosquitto broker.",
+      "skills": ["mqtt-guccipachi"]
+    }
+  ]
+}
