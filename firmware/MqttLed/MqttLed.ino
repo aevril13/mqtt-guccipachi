@@ -1,8 +1,8 @@
 // XIAO ESP32C6 MQTT LED node for the guccipachi classroom broker.
 //
-//   subscribes  classroom/<id>/led/set      payload "on" | "off" | "toggle"
-//   publishes   classroom/<id>/led/state    "on" | "off"            (retained)
-//   publishes   classroom/<id>/status       "online" | "offline"    (retained, LWT)
+//   subscribes  guccipachi/<id>/led/set      payload "on" | "off" | "toggle"
+//   publishes   guccipachi/<id>/led/state    "on" | "off"            (retained)
+//   publishes   guccipachi/<id>/status       "online" | "offline"    (retained, LWT)
 //
 // <id> is DEVICE_NAME from arduino_secrets.h, or "c6-" + last 3 MAC bytes.
 // A0 sensor publishing lives in the separate MqttSensor sketch.
@@ -110,7 +110,7 @@ void setup() {
     deviceId = idBuf;
   }
 
-  String base   = "classroom/" + deviceId;
+  String base   = "guccipachi/" + deviceId;
   topicLedSet   = base + "/led/set";
   topicLedState = base + "/led/state";
   topicStatus   = base + "/status";

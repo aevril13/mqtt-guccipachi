@@ -15,7 +15,7 @@ set -euo pipefail
 
 MQTT_HOST="${MQTT_HOST:-192.168.0.75}"
 MQTT_PORT="${MQTT_PORT:-1883}"
-BASE="classroom"
+BASE="guccipachi"
 
 # Your own board's name, so you don't retype it on every command.
 # Saved by `./skill.sh name <id>`; MQTT_DEVICE in the environment wins over it.

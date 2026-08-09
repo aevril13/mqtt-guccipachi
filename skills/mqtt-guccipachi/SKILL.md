@@ -60,10 +60,10 @@ serial monitor at boot.
 
 | Topic | Direction | Payload |
 |---|---|---|
-| `classroom/<id>/led/set` | you → board | `on`, `off`, `toggle` |
-| `classroom/<id>/led/state` | board → you | `on`, `off` (retained) |
-| `classroom/<id>/sensor/a0` | board → you | `{"raw":2048,"mv":1650}` every 2s |
-| `classroom/<id>/status` | board → you | `online`, `offline` (retained, last will) |
+| `guccipachi/<id>/led/set` | you → board | `on`, `off`, `toggle` |
+| `guccipachi/<id>/led/state` | board → you | `on`, `off` (retained) |
+| `guccipachi/<id>/sensor/a0` | board → you | `{"raw":2048,"mv":1650}` every 2s |
+| `guccipachi/<id>/status` | board → you | `online`, `offline` (retained, last will) |
 
 `status` and `led/state` are retained, so a fresh subscriber learns the current
 state immediately instead of waiting for the next change.

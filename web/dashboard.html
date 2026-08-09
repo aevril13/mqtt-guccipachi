@@ -291,8 +291,8 @@ function nodeState(n, now) {
 function onMessage(topic, payload) {
   log(topic, payload);
 
-  const parts = topic.split('/');            // classroom/<id>/<...>
-  if (parts.length < 3 || parts[0] !== 'classroom') return;
+  const parts = topic.split('/');            // guccipachi/<id>/<...>
+  if (parts.length < 3 || parts[0] !== 'guccipachi') return;
   const id = parts[1];
   const leaf = parts.slice(2).join('/');
 
@@ -316,8 +316,8 @@ function onMessage(topic, payload) {
 
 function sendLed(id, state) {
   if (!client) return;
-  client.publish(`classroom/${id}/led/set`, state);
-  log(`classroom/${id}/led/set`, `${state}  (sent)`);
+  client.publish(`guccipachi/${id}/led/set`, state);
+  log(`guccipachi/${id}/led/set`, `${state}  (sent)`);
 }
 
 /* ------------------------------------------------------------------
@@ -427,8 +427,8 @@ function connect() {
   client = new MqttClient(url, {
     onConnect: () => {
       setState('up', `연결됨 — ${url}`);
-      client.subscribe('classroom/#');
-      log('(dashboard)', 'subscribed to classroom/#');
+      client.subscribe('guccipachi/#');
+      log('(dashboard)', 'subscribed to guccipachi/#');
     },
     onRefused: (rc) => setState('down', `브로커가 연결을 거부했습니다 (rc=${rc})`),
     onError: () => setState('down', `연결 실패 — ${url} 에 닿지 못했습니다`),

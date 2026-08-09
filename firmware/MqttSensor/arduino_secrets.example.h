@@ -8,6 +8,6 @@
 #define MQTT_HOST   "192.168.0.75"         // heejung's laptop on ICEE (the broker)
 #define MQTT_PORT   1883
 
-// Your board's name on the broker: topics become classroom/<name>/...
+// Your board's name on the broker: topics become guccipachi/<name>/...
 // Leave it empty ("") to fall back to "c6-" + last 3 bytes of the MAC.
 #define DEVICE_NAME "your-name"

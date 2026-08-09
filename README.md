@@ -108,10 +108,10 @@ with their own `DEVICE_NAME`.
 
 | Topic | Direction | Payload |
 |---|---|---|
-| `classroom/<id>/led/set` | client → board | `on`, `off`, `toggle` |
-| `classroom/<id>/led/state` | board → client | `on`, `off` (retained) |
-| `classroom/<id>/sensor/a0` | board → client | `{"raw":2048,"mv":1650}` every 2s |
-| `classroom/<id>/status` | board → client | `online`, `offline` (retained, last will) |
+| `guccipachi/<id>/led/set` | client → board | `on`, `off`, `toggle` |
+| `guccipachi/<id>/led/state` | board → client | `on`, `off` (retained) |
+| `guccipachi/<id>/sensor/a0` | board → client | `{"raw":2048,"mv":1650}` every 2s |
+| `guccipachi/<id>/status` | board → client | `online`, `offline` (retained, last will) |
 
 ## Security
 
